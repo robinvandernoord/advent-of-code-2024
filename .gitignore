@@ -1,0 +1,5 @@
+*/Cargo.lockgit statu
+*.swp
+*.txt
+*/target/
+*/.idea/

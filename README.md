@@ -1,0 +1,4 @@
+
+```bash
+cargo test -- --nocapture
+```
