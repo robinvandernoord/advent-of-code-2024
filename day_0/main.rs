@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
@@ -26,19 +27,45 @@ async fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<FileHandle> {
 }
 
 #[tokio::test]
-async fn test_simple() {
+async fn test_simple_minimal() {
     let answer = 0;
 
-    let file = read_lines("simple.txt").await.expect("Should be able to read simple.txt");
+    let file = read_lines("minimal.txt")
+        .await
+        .expect("Should be able to read minimal.txt");
 
     assert_eq!(simple(file).await.expect("Oof 1"), answer);
 }
-
-#[tokio::test]
-async fn test_advanced() {
-    let answer = 0;
-
-    let file = read_lines("advanced.txt").await.expect("Should be able to read advanced.txt");
-
-    assert_eq!(advanced(file).await.expect("Oof 2"), answer);
-}
+// 
+// #[tokio::test]
+// async fn test_simple() {
+//     let answer = 0;
+// 
+//     let file = read_lines("simple.txt")
+//         .await
+//         .expect("Should be able to read simple.txt");
+// 
+//     assert_eq!(simple(file).await.expect("Oof 1"), answer);
+// }
+// 
+// #[tokio::test]
+// async fn test_advanced_minimal() {
+//     let answer = 0;
+// 
+//     let file = read_lines("minimal.txt")
+//         .await
+//         .expect("Should be able to read minimal.txt");
+// 
+//     assert_eq!(simple(file).await.expect("Oof 1"), answer);
+// }
+// 
+// #[tokio::test]
+// async fn test_advanced() {
+//     let answer = 0;
+// 
+//     let file = read_lines("advanced.txt")
+//         .await
+//         .expect("Should be able to read advanced.txt");
+// 
+//     assert_eq!(advanced(file).await.expect("Oof 2"), answer);
+// }
