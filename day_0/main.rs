@@ -4,14 +4,14 @@ use std::io::{self, BufRead};
 use std::path::Path;
 
 async fn simple(file: FileHandle) -> anyhow::Result<i64> {
-    for line in file.flatten() {
+    for line in file.map_while(Result::ok) {
         println!("{}", line);
     }
     Ok(0)
 }
 
 async fn advanced(file: FileHandle) -> anyhow::Result<i64> {
-    for line in file.flatten() {
+    for line in file.map_while(Result::ok) {
         println!("{}", line);
     }
     Ok(0)
@@ -36,36 +36,36 @@ async fn test_simple_minimal() {
 
     assert_eq!(simple(file).await.expect("Oof 1"), answer);
 }
-// 
+//
 // #[tokio::test]
 // async fn test_simple() {
 //     let answer = 0;
-// 
+//
 //     let file = read_lines("simple.txt")
 //         .await
 //         .expect("Should be able to read simple.txt");
-// 
+//
 //     assert_eq!(simple(file).await.expect("Oof 1"), answer);
 // }
-// 
+//
 // #[tokio::test]
 // async fn test_advanced_minimal() {
 //     let answer = 0;
-// 
+//
 //     let file = read_lines("minimal.txt")
 //         .await
 //         .expect("Should be able to read minimal.txt");
-// 
+//
 //     assert_eq!(simple(file).await.expect("Oof 1"), answer);
 // }
-// 
+//
 // #[tokio::test]
 // async fn test_advanced() {
 //     let answer = 0;
-// 
+//
 //     let file = read_lines("advanced.txt")
 //         .await
 //         .expect("Should be able to read advanced.txt");
-// 
+//
 //     assert_eq!(advanced(file).await.expect("Oof 2"), answer);
 // }
