@@ -36,14 +36,14 @@ async fn test_simple_minimal() {
 
     assert_eq!(simple(file).await.expect("Oof 1"), answer);
 }
-//
+
 // #[tokio::test]
 // async fn test_simple() {
 //     let answer = 0;
 //
-//     let file = read_lines("simple.txt")
+//     let file = read_lines("input.txt")
 //         .await
-//         .expect("Should be able to read simple.txt");
+//         .expect("Should be able to read input.txt");
 //
 //     assert_eq!(simple(file).await.expect("Oof 1"), answer);
 // }
@@ -56,16 +56,16 @@ async fn test_simple_minimal() {
 //         .await
 //         .expect("Should be able to read minimal.txt");
 //
-//     assert_eq!(simple(file).await.expect("Oof 1"), answer);
+//     assert_eq!(advanced(file).await.expect("Oof 1"), answer);
 // }
 //
 // #[tokio::test]
 // async fn test_advanced() {
 //     let answer = 0;
 //
-//     let file = read_lines("advanced.txt")
+//     let file = read_lines("input.txt")
 //         .await
-//         .expect("Should be able to read advanced.txt");
+//         .expect("Should be able to read input.txt");
 //
 //     assert_eq!(advanced(file).await.expect("Oof 2"), answer);
 // }
