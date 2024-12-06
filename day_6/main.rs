@@ -104,9 +104,12 @@ async fn simple(file: FileHandle) -> anyhow::Result<i64> {
 async fn advanced(file: FileHandle) -> anyhow::Result<i64> {
     let (guard, matrix) = parse_matrix(file);
 
+    let mut initial_route = HashSet::new();
+    walk_route(guard, &matrix, &mut initial_route);
+
     let mut loops = 0;
-    for (point, current_char) in &matrix {
-        // eprintln!("{} / {}; {} found!", idx, matrix.len(), loops);
+    for point in &initial_route {
+        let current_char = matrix.get(point).expect("Matrix should have point");
         if current_char != &'.' {
             // irrelevant, skip!
             continue;
