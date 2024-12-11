@@ -45,23 +45,34 @@ fn blink(stones: &mut Vec<i64>, times: i64) {
 type SharedCache = Arc<RwLock<HashMap<(i64, i64), i64>>>;
 
 fn blink_v2(stone: i64, times: i64, shared_cache: &SharedCache) -> i64 {
-    // similar logic to v1 but goes in chunks to reduce memory usage
-    // (which became > 50% on part 2!)
+    let cache_key = (stone, times);
 
     if times == 0 {
         return 1;
     }
 
-    if stone == 0 {
+    if let Ok(cache_lock) = shared_cache.read() {
+        if cache_lock.contains_key(&cache_key) {
+            return cache_lock[&cache_key];
+        }
+    }
+
+    let result = if stone == 0 {
         blink_v2(1, times - 1, shared_cache)
     } else if even_digits(&stone) {
         // note: order is ignored for performance here; could be required later?
         let (first, second) = split_in_half(&stone);
-        
+
         blink_v2(first, times - 1, shared_cache) + blink_v2(second, times - 1, shared_cache)
     } else {
         blink_v2(stone * 2024, times - 1, shared_cache)
+    };
+
+    if let Ok(mut cache_lock) = shared_cache.write() {
+        cache_lock.insert(cache_key, result);
     }
+
+    result
 }
 
 async fn simple(file: FileHandle, n: i64) -> anyhow::Result<i64> {
@@ -116,34 +127,34 @@ async fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<FileHandle> {
     Ok(io::BufReader::new(file).lines())
 }
 
-// #[tokio::test]
-// async fn test_simple_minimal_6() {
-//     let file = read_lines("minimal.txt")
-//         .await
-//         .expect("Should be able to read minimal.txt");
-//
-//     assert_eq!(simple(file, 6).await.expect("Oof 1"), 22);
-// }
-//
-// #[tokio::test]
-// async fn test_simple_minimal_25() {
-//     let file = read_lines("minimal.txt")
-//         .await
-//         .expect("Should be able to read minimal.txt");
-//
-//     assert_eq!(simple(file, 25).await.expect("Oof 1"), 55312);
-// }
-//
-// #[tokio::test]
-// async fn test_simple() {
-//     let answer = 203457;
-//
-//     let file = read_lines("input.txt")
-//         .await
-//         .expect("Should be able to read input.txt");
-//
-//     assert_eq!(simple(file, 25).await.expect("Oof 1"), answer);
-// }
+#[tokio::test]
+async fn test_simple_minimal_6() {
+    let file = read_lines("minimal.txt")
+        .await
+        .expect("Should be able to read minimal.txt");
+
+    assert_eq!(simple(file, 6).await.expect("Oof 1"), 22);
+}
+
+#[tokio::test]
+async fn test_simple_minimal_25() {
+    let file = read_lines("minimal.txt")
+        .await
+        .expect("Should be able to read minimal.txt");
+
+    assert_eq!(simple(file, 25).await.expect("Oof 1"), 55312);
+}
+
+#[tokio::test]
+async fn test_simple() {
+    let answer = 203457;
+
+    let file = read_lines("input.txt")
+        .await
+        .expect("Should be able to read input.txt");
+
+    assert_eq!(simple(file, 25).await.expect("Oof 1"), answer);
+}
 
 #[tokio::test]
 async fn test_simple_minimal_6_v2() {
@@ -233,18 +244,19 @@ async fn test_simple_v2() {
 //     assert_eq!(v.len(), 437102505);
 // }
 
-// #[tokio::test]
-// async fn test_simulate_blink_v2() {
-//     assert_eq!(blink_v2(0, 49), 437102505); // 34s
-// }
+#[tokio::test]
+async fn test_simulate_blink_v2() {
+    let shared_cache: SharedCache = Default::default();
+    assert_eq!(blink_v2(0, 49, &shared_cache), 437102505); // 34s before, 0.01s after
+}
 
-// #[tokio::test]
-// async fn test_advanced() {
-//     let answer = 0;
+#[tokio::test]
+async fn test_advanced() {
+    let answer = 241394363462435;
 
-//     let file = read_lines("input.txt")
-//         .await
-//         .expect("Should be able to read input.txt");
+    let file = read_lines("input.txt")
+        .await
+        .expect("Should be able to read input.txt");
 
-//     assert_eq!(advanced(file, 75).await.expect("Oof 2"), answer);
-// }
+    assert_eq!(advanced(file, 75).await.expect("Oof 2"), answer);
+}
