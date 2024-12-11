@@ -39,6 +39,38 @@ fn blink(stones: &mut Vec<i64>, times: i64) {
     blink(stones, times - 1)
 }
 
+fn blink_v2(stones: &[i64], times: i64) -> i64 {
+    // similar logic to v1 but goes in chunks to reduce memory usage
+    // (which became > 50% on part 2!)
+
+    if times == 0 {
+        return stones.len() as i64;
+    }
+    // eprintln!("{} -> {}", times, stones.len());
+    let mut new_stones = Vec::with_capacity(stones.len() * 2);
+
+    for stone in stones {
+        if stone == &0 {
+            new_stones.push(1)
+        } else if even_digits(stone) {
+            // note: order is ignored for performance here; could be required later?
+            let (first, second) = split_in_half(stone);
+            new_stones.push(first);
+            new_stones.push(second);
+        } else {
+            new_stones.push(stone * 2024);
+        }
+    }
+
+    let mut result = 0;
+
+    for window in new_stones.chunks(10_000) {
+        result += blink_v2(&window, times - 1);
+    }
+
+    result
+}
+
 async fn simple(file: FileHandle, n: i64) -> anyhow::Result<i64> {
     if let Some(line) = file.map_while(Result::ok).next() {
         let mut stones: Vec<i64> = line
@@ -52,19 +84,17 @@ async fn simple(file: FileHandle, n: i64) -> anyhow::Result<i64> {
     Ok(0)
 }
 
-// async fn advanced(file: FileHandle, n: i64) -> anyhow::Result<i64> {
-//     if let Some(line) = file.map_while(Result::ok).next() {
-//         let mut stones: Vec<i64> = line
-//             .split(" ")
-//             .map(|it| it.parse().expect("Should be numbers"))
-//             .collect();
-//
-//         return Ok(
-//             blink_v2(&mut stones, n)
-//         )
-//     }
-//     Ok(0)
-// }
+async fn advanced(file: FileHandle, n: i64) -> anyhow::Result<i64> {
+    if let Some(line) = file.map_while(Result::ok).next() {
+        let stones: Vec<i64> = line
+            .split(" ")
+            .map(|it| it.parse().expect("Should be numbers"))
+            .collect();
+
+        return Ok(blink_v2(&stones, n));
+    }
+    Ok(0)
+}
 
 // -- tests --
 
@@ -75,37 +105,37 @@ async fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<FileHandle> {
     Ok(io::BufReader::new(file).lines())
 }
 
-#[tokio::test]
-async fn test_simple_minimal_6() {
-    let file = read_lines("minimal.txt")
-        .await
-        .expect("Should be able to read minimal.txt");
-
-    assert_eq!(simple(file, 6).await.expect("Oof 1"), 22);
-}
-
-#[tokio::test]
-async fn test_simple_minimal_25() {
-    let file = read_lines("minimal.txt")
-        .await
-        .expect("Should be able to read minimal.txt");
-
-    assert_eq!(simple(file, 25).await.expect("Oof 1"), 55312);
-}
-
-#[tokio::test]
-async fn test_simple() {
-    let answer = 203457;
-
-    let file = read_lines("input.txt")
-        .await
-        .expect("Should be able to read input.txt");
-
-    assert_eq!(simple(file, 25).await.expect("Oof 1"), answer);
-}
+// #[tokio::test]
+// async fn test_simple_minimal_6() {
+//     let file = read_lines("minimal.txt")
+//         .await
+//         .expect("Should be able to read minimal.txt");
+//
+//     assert_eq!(simple(file, 6).await.expect("Oof 1"), 22);
+// }
+//
+// #[tokio::test]
+// async fn test_simple_minimal_25() {
+//     let file = read_lines("minimal.txt")
+//         .await
+//         .expect("Should be able to read minimal.txt");
+//
+//     assert_eq!(simple(file, 25).await.expect("Oof 1"), 55312);
+// }
+//
+// #[tokio::test]
+// async fn test_simple() {
+//     let answer = 203457;
+//
+//     let file = read_lines("input.txt")
+//         .await
+//         .expect("Should be able to read input.txt");
+//
+//     assert_eq!(simple(file, 25).await.expect("Oof 1"), answer);
+// }
 
 // #[tokio::test]
-// async fn test_simulate_blink() {
+// async fn test_simulate_blink_v1() {
 //     /**
 //     50 -> 1
 //     49 -> 1
@@ -159,17 +189,24 @@ async fn test_simple() {
 //     1 -> 437102505
 //     **/
 //     let mut v = vec![0];
-//     blink(&mut v, 49);
+//     blink(&mut v, 49); // 35.06s
 //     assert_eq!(v.len(), 437102505);
 // }
 
 // #[tokio::test]
-// async fn test_advanced() {
-//     let answer = 0;
-//
-//     let file = read_lines("input.txt")
-//         .await
-//         .expect("Should be able to read input.txt");
-//
-//     assert_eq!(advanced(file, 75).await.expect("Oof 2"), answer);
+// async fn test_simulate_blink_v2() {
+//     let v = vec![0];
+//     assert_eq!(blink_v2(&v, 49), 437102505); // 34s
 // }
+
+
+#[tokio::test]
+async fn test_advanced() {
+    let answer = 0;
+
+    let file = read_lines("input.txt")
+        .await
+        .expect("Should be able to read input.txt");
+
+    assert_eq!(advanced(file, 75).await.expect("Oof 2"), answer);
+}
