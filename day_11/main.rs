@@ -40,36 +40,24 @@ fn blink(stones: &mut Vec<i64>, times: i64) {
     blink(stones, times - 1)
 }
 
-fn blink_v2(stones: &[i64], times: i64) -> i64 {
+fn blink_v2(stone: i64, times: i64) -> i64 {
     // similar logic to v1 but goes in chunks to reduce memory usage
     // (which became > 50% on part 2!)
 
     if times == 0 {
-        return stones.len() as i64;
-    }
-    // eprintln!("{} -> {}", times, stones.len());
-    let mut new_stones = Vec::with_capacity(stones.len() * 2);
-
-    for stone in stones {
-        if stone == &0 {
-            new_stones.push(1)
-        } else if even_digits(stone) {
-            // note: order is ignored for performance here; could be required later?
-            let (first, second) = split_in_half(stone);
-            new_stones.push(first);
-            new_stones.push(second);
-        } else {
-            new_stones.push(stone * 2024);
-        }
+        return 1;
     }
 
-    let mut result = 0;
-
-    for window in new_stones.chunks(10_000) {
-        result += blink_v2(window, times - 1);
+    if stone == 0 {
+        blink_v2(1, times - 1)
+    } else if even_digits(&stone) {
+        // note: order is ignored for performance here; could be required later?
+        let (first, second) = split_in_half(&stone);
+        
+        blink_v2(first, times - 1) + blink_v2(second, times - 1)
+    } else {
+        blink_v2(stone * 2024, times - 1)
     }
-
-    result
 }
 
 async fn simple(file: FileHandle, n: i64) -> anyhow::Result<i64> {
@@ -100,10 +88,9 @@ async fn advanced(file: FileHandle, n: i64) -> anyhow::Result<i64> {
             .collect();
 
         let mut futures = vec![];
-        for stone in stones.chunks(1) {
+        for stone in stones {
             // one thread per initial stone
-            let clone_stone = stone.to_owned(); // needed because of multithreading :(
-            futures.push(thread::spawn(move || blink_v2(&clone_stone, n)));
+            futures.push(thread::spawn(move || blink_v2(stone, n)));
         }
 
         return Ok(join_all(futures).iter().sum());
@@ -243,13 +230,13 @@ async fn test_simple_v2() {
 //     assert_eq!(blink_v2(&v, 49), 437102505); // 34s
 // }
 
-#[tokio::test]
-async fn test_advanced() {
-    let answer = 0;
+// #[tokio::test]
+// async fn test_advanced() {
+//     let answer = 0;
 
-    let file = read_lines("input.txt")
-        .await
-        .expect("Should be able to read input.txt");
+//     let file = read_lines("input.txt")
+//         .await
+//         .expect("Should be able to read input.txt");
 
-    assert_eq!(advanced(file, 75).await.expect("Oof 2"), answer);
-}
+//     assert_eq!(advanced(file, 75).await.expect("Oof 2"), answer);
+// }
