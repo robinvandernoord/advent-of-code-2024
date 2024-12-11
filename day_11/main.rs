@@ -1,7 +1,9 @@
 #![allow(dead_code)]
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
+use std::sync::{Arc, RwLock};
 use std::thread::{self, JoinHandle};
 
 fn even_digits(num: &i64) -> bool {
@@ -40,7 +42,9 @@ fn blink(stones: &mut Vec<i64>, times: i64) {
     blink(stones, times - 1)
 }
 
-fn blink_v2(stone: i64, times: i64) -> i64 {
+type SharedCache = Arc<RwLock<HashMap<(i64, i64), i64>>>;
+
+fn blink_v2(stone: i64, times: i64, shared_cache: &SharedCache) -> i64 {
     // similar logic to v1 but goes in chunks to reduce memory usage
     // (which became > 50% on part 2!)
 
@@ -49,14 +53,14 @@ fn blink_v2(stone: i64, times: i64) -> i64 {
     }
 
     if stone == 0 {
-        blink_v2(1, times - 1)
+        blink_v2(1, times - 1, shared_cache)
     } else if even_digits(&stone) {
         // note: order is ignored for performance here; could be required later?
         let (first, second) = split_in_half(&stone);
         
-        blink_v2(first, times - 1) + blink_v2(second, times - 1)
+        blink_v2(first, times - 1, shared_cache) + blink_v2(second, times - 1, shared_cache)
     } else {
-        blink_v2(stone * 2024, times - 1)
+        blink_v2(stone * 2024, times - 1, shared_cache)
     }
 }
 
@@ -88,9 +92,14 @@ async fn advanced(file: FileHandle, n: i64) -> anyhow::Result<i64> {
             .collect();
 
         let mut futures = vec![];
+
+        // {(value, steps): result}
+        let shared_cache: SharedCache = Default::default();
+
         for stone in stones {
             // one thread per initial stone
-            futures.push(thread::spawn(move || blink_v2(stone, n)));
+            let cache_clone = shared_cache.clone();
+            futures.push(thread::spawn(move || blink_v2(stone, n, &cache_clone)));
         }
 
         return Ok(join_all(futures).iter().sum());
@@ -226,8 +235,7 @@ async fn test_simple_v2() {
 
 // #[tokio::test]
 // async fn test_simulate_blink_v2() {
-//     let v = vec![0];
-//     assert_eq!(blink_v2(&v, 49), 437102505); // 34s
+//     assert_eq!(blink_v2(0, 49), 437102505); // 34s
 // }
 
 // #[tokio::test]
