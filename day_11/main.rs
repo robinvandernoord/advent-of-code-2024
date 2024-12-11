@@ -2,6 +2,7 @@
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
+use std::thread::{self, JoinHandle};
 
 fn even_digits(num: &i64) -> bool {
     let string = num.to_string();
@@ -65,7 +66,7 @@ fn blink_v2(stones: &[i64], times: i64) -> i64 {
     let mut result = 0;
 
     for window in new_stones.chunks(10_000) {
-        result += blink_v2(&window, times - 1);
+        result += blink_v2(window, times - 1);
     }
 
     result
@@ -74,7 +75,7 @@ fn blink_v2(stones: &[i64], times: i64) -> i64 {
 async fn simple(file: FileHandle, n: i64) -> anyhow::Result<i64> {
     if let Some(line) = file.map_while(Result::ok).next() {
         let mut stones: Vec<i64> = line
-            .split(" ")
+            .split(' ')
             .map(|it| it.parse().expect("Should be numbers"))
             .collect();
 
@@ -84,14 +85,28 @@ async fn simple(file: FileHandle, n: i64) -> anyhow::Result<i64> {
     Ok(0)
 }
 
+fn join_all<T: Sized>(futures: Vec<JoinHandle<T>>) -> Vec<T> {
+    futures
+        .into_iter()
+        .map(|it| it.join().expect("Should be fine"))
+        .collect()
+}
+
 async fn advanced(file: FileHandle, n: i64) -> anyhow::Result<i64> {
     if let Some(line) = file.map_while(Result::ok).next() {
         let stones: Vec<i64> = line
-            .split(" ")
+            .split(' ')
             .map(|it| it.parse().expect("Should be numbers"))
             .collect();
 
-        return Ok(blink_v2(&stones, n));
+        let mut futures = vec![];
+        for stone in stones.chunks(1) {
+            // one thread per initial stone
+            let clone_stone = stone.to_owned(); // needed because of multithreading :(
+            futures.push(thread::spawn(move || blink_v2(&clone_stone, n)));
+        }
+
+        return Ok(join_all(futures).iter().sum());
     }
     Ok(0)
 }
@@ -133,6 +148,35 @@ async fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<FileHandle> {
 //
 //     assert_eq!(simple(file, 25).await.expect("Oof 1"), answer);
 // }
+
+#[tokio::test]
+async fn test_simple_minimal_6_v2() {
+    let file = read_lines("minimal.txt")
+        .await
+        .expect("Should be able to read minimal.txt");
+
+    assert_eq!(advanced(file, 6).await.expect("Oof 1"), 22);
+}
+
+#[tokio::test]
+async fn test_simple_minimal_25_v2() {
+    let file = read_lines("minimal.txt")
+        .await
+        .expect("Should be able to read minimal.txt");
+
+    assert_eq!(advanced(file, 25).await.expect("Oof 1"), 55312);
+}
+
+#[tokio::test]
+async fn test_simple_v2() {
+    let answer = 203457;
+
+    let file = read_lines("input.txt")
+        .await
+        .expect("Should be able to read input.txt");
+
+    assert_eq!(advanced(file, 25).await.expect("Oof 1"), answer);
+}
 
 // #[tokio::test]
 // async fn test_simulate_blink_v1() {
@@ -198,7 +242,6 @@ async fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<FileHandle> {
 //     let v = vec![0];
 //     assert_eq!(blink_v2(&v, 49), 437102505); // 34s
 // }
-
 
 #[tokio::test]
 async fn test_advanced() {
