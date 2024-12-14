@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use image::{ImageBuffer, Luma};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::cmp::Ordering;
@@ -26,6 +27,10 @@ fn wrap(number: i64, max: i64) -> i64 {
     number.rem_euclid(max)
 }
 
+trait Moves {
+    fn moves(&mut self, times: i64, width: i64, height: i64);
+}
+
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
 struct Robot {
     pub position: Point,
@@ -48,7 +53,9 @@ impl Robot {
             velocity: parse_point(v).expect("Should be valid velocity"),
         }
     }
+}
 
+impl Moves for Robot {
     fn moves(&mut self, times: i64, width: i64, height: i64) {
         let new_x = wrap(self.position.0 + (self.velocity.0 * times), width);
         let new_y = wrap(self.position.1 + (self.velocity.1 * times), height);
@@ -63,7 +70,14 @@ impl Robot {
     }
 }
 
-fn draw(robots: &[Robot], width: i64, height: i64) {
+impl Moves for Vec<Robot> {
+    fn moves(&mut self, times: i64, width: i64, height: i64) {
+        self.iter_mut()
+            .for_each(|robot| robot.moves(times, width, height));
+    }
+}
+
+fn collect_robots_per_point(robots: &[Robot]) -> HashMap<Point, Vec<&Robot>> {
     let mut robots_per_point: HashMap<Point, Vec<&Robot>> = Default::default();
 
     robots.iter().for_each(|robot| {
@@ -72,6 +86,12 @@ fn draw(robots: &[Robot], width: i64, height: i64) {
             .or_default()
             .push(robot);
     });
+
+    robots_per_point
+}
+
+fn draw(robots: &[Robot], width: i64, height: i64) {
+    let mut robots_per_point = collect_robots_per_point(robots);
 
     assert_ne!(robots_per_point.len(), 0, "No robots to print?");
 
@@ -92,24 +112,7 @@ fn draw(robots: &[Robot], width: i64, height: i64) {
     assert_eq!(robots_per_point.len(), 0, "Unprinted robots left?");
 }
 
-async fn simple(file: FileHandle, width: i64, height: i64, times: i64) -> anyhow::Result<i64> {
-    let mut robots: Vec<Robot> = Default::default();
-
-    for line in file.map_while(Result::ok) {
-        if line.starts_with("#") {
-            continue;
-        }
-
-        let robot = Robot::parse(&line);
-        robots.push(robot);
-    }
-
-    // draw(&robots, width, height);
-    robots
-        .iter_mut()
-        .for_each(|robot| robot.moves(times, width, height));
-    // draw(&robots, width, height);
-
+fn quadrant_score(robots: &[Robot], width: i64, height: i64) -> i64 {
     let mut quadrants: [i64; 4] = [0, 0, 0, 0];
 
     let max_x = width / 2;
@@ -136,17 +139,82 @@ async fn simple(file: FileHandle, width: i64, height: i64, times: i64) -> anyhow
         }
     });
 
-    Ok(quadrants
+    quadrants
         .into_iter()
         .reduce(|a, b| a * b)
-        .expect("What could go wrong"))
+        .expect("What could go wrong")
 }
 
-async fn advanced(file: FileHandle) -> anyhow::Result<i64> {
+fn parse_robots(file: FileHandle) -> Vec<Robot> {
+    let mut robots: Vec<Robot> = Default::default();
+
     for line in file.map_while(Result::ok) {
-        println!("{}", line);
+        if line.starts_with("#") {
+            continue;
+        }
+
+        let robot = Robot::parse(&line);
+        robots.push(robot);
     }
-    Ok(0)
+
+    robots
+}
+
+async fn simple(file: FileHandle, width: i64, height: i64, times: i64) -> anyhow::Result<i64> {
+    let mut robots = parse_robots(file);
+
+    // draw(&robots, width, height);
+    robots.moves(times, width, height);
+    // draw(&robots, width, height);
+
+    Ok(quadrant_score(&robots, width, height))
+}
+
+fn to_image(robots: &[Robot], width: i64, height: i64, iteration: i64) {
+    let filename = format!("./output/img_{}.png", iteration);
+    let mut img = ImageBuffer::new(width as u32, height as u32);
+
+    let robots_per_point = collect_robots_per_point(robots);
+
+    for y in 0..height {
+        for x in 0..width {
+            let point: Point = (x, y);
+            let pixel: u8 = if robots_per_point.contains_key(&point) {
+                255
+            } else {
+                0
+            };
+
+            img.put_pixel(x as u32, y as u32, Luma([pixel]));
+        }
+    }
+
+    img.save(filename).expect("Failed to save image");
+}
+
+async fn advanced(file: FileHandle, width: i64, height: i64) -> anyhow::Result<i64> {
+    let mut robots = parse_robots(file);
+
+    for iteration in 0..10_000 {
+        if iteration % 1000 == 0 {
+            print!("i: {iteration}\r")
+        }
+
+        // print until we see a christmas tree
+        to_image(&robots, width, height, iteration);
+        robots.moves(1, width, height);
+    }
+
+    Ok(-1)
+}
+
+#[tokio::main]
+async fn main() {
+    let file = read_lines("input.txt")
+        .await
+        .expect("Should be able to read input.txt");
+
+    let _ = dbg!(advanced(file, 101, 103).await);
 }
 
 // -- tests --
@@ -191,13 +259,13 @@ async fn test_simple() {
 //     assert_eq!(advanced(file).await.expect("Oof 1"), answer);
 // }
 //
-// #[tokio::test]
-// async fn test_advanced() {
-//     let answer = 0;
-//
-//     let file = read_lines("input.txt")
-//         .await
-//         .expect("Should be able to read input.txt");
-//
-//     assert_eq!(advanced(file).await.expect("Oof 2"), answer);
-// }
+#[tokio::test]
+async fn test_advanced() {
+    let answer = 0; // 8179
+
+    let file = read_lines("input.txt")
+        .await
+        .expect("Should be able to read input.txt");
+
+    assert_eq!(advanced(file, 101, 103).await.expect("Oof 2"), answer);
+}
