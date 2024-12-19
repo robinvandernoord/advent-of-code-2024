@@ -7,6 +7,7 @@ use std::path::Path;
 
 // track possibility of goal given previous:
 type Memo = HashMap<(String, String), bool>;
+type CountMemo = HashMap<(String, String), i64>;
 
 fn matches<S: AsRef<str>>(goal: &str, previous: &str, patterns: &[S], memo: &mut Memo) -> bool {
     if goal.is_empty() {
@@ -38,7 +39,42 @@ fn matches<S: AsRef<str>>(goal: &str, previous: &str, patterns: &[S], memo: &mut
     false
 }
 
-async fn simple(file: FileHandle) -> anyhow::Result<i64> {
+fn count_matches<S: AsRef<str>>(
+    goal: &str,
+    previous: &str,
+    patterns: &[S],
+    memo: &mut CountMemo,
+) -> i64 {
+    if goal.is_empty() {
+        return 1;
+    }
+
+    let mut result = 0;
+
+    for candidate in patterns {
+        // None if it doesn't start with candiate, Some if it does:
+        let candidate_str = candidate.as_ref();
+
+        if let Some(subpattern) = goal.strip_prefix(candidate_str) {
+            let cache_key = (subpattern.to_string(), previous.to_string());
+
+            let subresult: i64;
+            if let Some(existing) = memo.get(&cache_key) {
+                subresult = *existing;
+            } else {
+                // recurse here:
+                subresult = count_matches(subpattern, candidate_str, patterns, memo);
+                memo.insert(cache_key, subresult);
+            }
+
+            result += subresult
+        }
+    }
+
+    result
+}
+
+fn parse_file(file: FileHandle) -> (Vec<String>, Vec<String>) {
     let mut pattern_mode = true;
 
     let mut patterns = vec![];
@@ -55,6 +91,12 @@ async fn simple(file: FileHandle) -> anyhow::Result<i64> {
             goals.push(line)
         }
     }
+
+    (goals, patterns)
+}
+
+async fn simple(file: FileHandle) -> anyhow::Result<i64> {
+    let (goals, patterns) = parse_file(file);
 
     let mut result = 0;
 
@@ -73,10 +115,20 @@ async fn simple(file: FileHandle) -> anyhow::Result<i64> {
 }
 
 async fn advanced(file: FileHandle) -> anyhow::Result<i64> {
-    for line in file.map_while(Result::ok) {
-        println!("{}", line);
+    let (goals, patterns) = parse_file(file);
+
+    let mut result = 0;
+
+    for (idx, goal) in goals.iter().enumerate() {
+        eprintln!("{} / {}", idx + 1, goals.len());
+
+        // reset memo per run:
+        let mut memo = CountMemo::new();
+
+        result += count_matches(goal, "", &patterns, &mut memo);
     }
-    Ok(0)
+
+    Ok(result)
 }
 
 // -- tests --
@@ -114,24 +166,24 @@ async fn test_simple() {
     assert_eq!(result, answer);
 }
 
-// #[tokio::test]
-// async fn test_advanced_minimal() {
-//     let answer = 0;
-//
-//     let file = read_lines("minimal.txt")
-//         .await
-//         .expect("Should be able to read minimal.txt");
-//
-//     assert_eq!(advanced(file).await.expect("Oof 1"), answer);
-// }
-//
-// #[tokio::test]
-// async fn test_advanced() {
-//     let answer = 0;
-//
-//     let file = read_lines("input.txt")
-//         .await
-//         .expect("Should be able to read input.txt");
-//
-//     assert_eq!(advanced(file).await.expect("Oof 2"), answer);
-// }
+#[tokio::test]
+async fn test_advanced_minimal() {
+    let answer = 16;
+
+    let file = read_lines("minimal.txt")
+        .await
+        .expect("Should be able to read minimal.txt");
+
+    assert_eq!(advanced(file).await.expect("Oof 1"), answer);
+}
+
+#[tokio::test]
+async fn test_advanced() {
+    let answer = 996172272010026;
+
+    let file = read_lines("input.txt")
+        .await
+        .expect("Should be able to read input.txt");
+
+    assert_eq!(advanced(file).await.expect("Oof 2"), answer);
+}
