@@ -1,0 +1,13 @@
+[package]
+name = "day_0"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "advent_of_code"
+path = "main.rs"
+
+[dependencies]
+tokio = {version = "1.41", features = ["full"]}
+anyhow = "1.0"
+# bimap = "0.6.3"
